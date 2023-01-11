@@ -5,8 +5,8 @@ import torch.nn.functional as F
 from torchvision import models, transforms
 from PIL import Image
 
-classes_ja = ["飛行機", "自動車", "鳥", "猫", "鹿", "犬", "カエル", "馬", "船", "トラック"]
-classes_en = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+classes_ja = ["Tシャツ/トップス", "ズボン", "プルオーバー", "ドレス", "コート", "サンダル", "シャツ", "スニーカー", "バッグ", "ブーツ"]
+classes_en = ["T-shirt/top", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"]
 n_class = len(classes_ja)
 img_size = 32
 
@@ -14,20 +14,29 @@ img_size = 32
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16*5*5, 256)
-        self.dropout = nn.Dropout(p=0.5)
-        self.fc2 = nn.Linear(256, 10)
+        self.features = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(64 * 7 * 7, 128),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(128, 10),
+            nn.LogSoftmax(dim=1),
+        )
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16*5*5)
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
+        x = self.features(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+
         return x
 
 def predict(img):
@@ -35,7 +44,7 @@ def predict(img):
     img = img.convert("RGB")
     img = img.resize((img_size, img_size))
     transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.Normalize((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))  # 平均値を0、標準偏差を1に
+                                    transforms.Normalize((0.5,), (0.5,))  
                                 ])
     img = transform(img)
     x = img.reshape(1, 3, img_size, img_size)
